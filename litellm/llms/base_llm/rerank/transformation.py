@@ -17,6 +17,26 @@ else:
     LiteLLMLoggingObj = Any
 
 
+def calculate_per_query_rerank_cost(
+    model_info: ModelInfo | None,
+    billed_units: RerankBilledUnits | None,
+) -> tuple[float, float]:
+    if (
+        model_info is None
+        or "input_cost_per_query" not in model_info
+        or model_info["input_cost_per_query"] is None
+        or billed_units is None
+    ):
+        return 0.0, 0.0
+
+    search_units: Final = billed_units.get("search_units")
+
+    if search_units is None:
+        return 0.0, 0.0
+
+    return model_info["input_cost_per_query"] * search_units, 0.0
+
+
 class BaseRerankConfig(ABC):
     @abstractmethod
     def validate_environment(
@@ -118,19 +138,4 @@ class BaseRerankConfig(ABC):
             Tuple[float, float] - prompt_cost_in_usd, completion_cost_in_usd
         """
 
-        if (
-            model_info is None
-            or "input_cost_per_query" not in model_info
-            or model_info["input_cost_per_query"] is None
-            or billed_units is None
-        ):
-            return 0.0, 0.0
-
-        search_units: Final = billed_units.get("search_units")
-
-        if search_units is None:
-            return 0.0, 0.0
-
-        prompt_cost: Final = model_info["input_cost_per_query"] * search_units
-
-        return prompt_cost, 0.0
+        return calculate_per_query_rerank_cost(model_info=model_info, billed_units=billed_units)

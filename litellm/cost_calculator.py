@@ -77,6 +77,7 @@ from litellm.llms.azure_ai.cost_calculator import (
 from litellm.llms.azure_ai.cost_calculator import (
     is_azure_model_router as azure_ai_is_model_router_name,
 )
+from litellm.llms.base_llm.rerank.transformation import calculate_per_query_rerank_cost
 from litellm.llms.base_llm.search.transformation import SearchResponse
 from litellm.llms.bedrock.cost_calculation import (
     cost_per_token as bedrock_cost_per_token,
@@ -3061,6 +3062,9 @@ def rerank_cost(
             model_info: ModelInfo | None = litellm.get_model_info(model=model, custom_llm_provider=custom_llm_provider)
         except Exception:
             model_info = None
+
+        if config is None:
+            return calculate_per_query_rerank_cost(model_info=model_info, billed_units=billed_units)
 
         return config.calculate_rerank_cost(
             model=model,

@@ -160,7 +160,7 @@ def rerank(
             api_key=optional_params.api_key,
         )
 
-        rerank_provider_config: Final[BaseRerankConfig] = ProviderConfigManager.get_provider_rerank_config(
+        rerank_provider_config: Final[BaseRerankConfig | None] = ProviderConfigManager.get_provider_rerank_config(
             model=model,
             provider=litellm.LlmProviders(_custom_llm_provider),
             api_base=optional_params.api_base,
@@ -209,7 +209,63 @@ def rerank(
         )
 
         # Implement rerank logic here based on the custom_llm_provider
-        if (
+        if rerank_provider_config is None and _custom_llm_provider == litellm.LlmProviders.TOGETHER_AI:
+            # Implement Together AI rerank logic
+            api_key = (
+                dynamic_api_key
+                or optional_params.api_key
+                or litellm.togetherai_api_key
+                or get_secret("TOGETHERAI_API_KEY")
+                or litellm.api_key
+            )
+
+            if api_key is None:
+                raise ValueError("TogetherAI API key is required, please set 'TOGETHERAI_API_KEY' in your environment")
+
+            api_base = dynamic_api_base or optional_params.api_base or litellm.api_base or "https://api.together.ai/v1"
+
+            response = together_rerank.rerank(
+                model=model,
+                query=query,
+                documents=documents,
+                top_n=top_n,
+                rank_fields=rank_fields,
+                return_documents=return_documents,
+                max_chunks_per_doc=max_chunks_per_doc,
+                api_key=api_key,
+                api_base=api_base,
+                _is_async=_is_async,
+            )
+        elif rerank_provider_config is None and _custom_llm_provider == litellm.LlmProviders.BEDROCK:
+            api_base = (
+                dynamic_api_base or optional_params.api_base or litellm.api_base or get_secret("BEDROCK_API_BASE")
+            )
+
+            # Merge headers and extra_headers if both are provided
+            merged_headers = headers or litellm.headers or {}
+            extra_headers_from_kwargs: Final = kwargs.get("extra_headers")
+            if extra_headers_from_kwargs:
+                merged_headers = {**merged_headers, **extra_headers_from_kwargs}
+
+            response = bedrock_rerank.rerank(
+                model=model,
+                query=query,
+                documents=documents,
+                top_n=top_n,
+                rank_fields=rank_fields,
+                return_documents=return_documents,
+                max_chunks_per_doc=max_chunks_per_doc,
+                _is_async=_is_async,
+                optional_params=optional_params.model_dump(exclude_unset=True),
+                timeout=optional_params.timeout,
+                api_base=api_base,
+                extra_headers=merged_headers,
+                logging_obj=litellm_logging_obj,
+                client=client,
+            )
+        elif rerank_provider_config is None:
+            raise ValueError(f"Unsupported provider: {_custom_llm_provider}")
+        elif (
             _custom_llm_provider == litellm.LlmProviders.COHERE
             or _custom_llm_provider == litellm.LlmProviders.LITELLM_PROXY
         ):
@@ -289,33 +345,6 @@ def rerank(
                 model_response=model_response,
                 litellm_params=rerank_litellm_params,
             )
-        elif _custom_llm_provider == litellm.LlmProviders.TOGETHER_AI:
-            # Implement Together AI rerank logic
-            api_key = (
-                dynamic_api_key
-                or optional_params.api_key
-                or litellm.togetherai_api_key
-                or get_secret("TOGETHERAI_API_KEY")
-                or litellm.api_key
-            )
-
-            if api_key is None:
-                raise ValueError("TogetherAI API key is required, please set 'TOGETHERAI_API_KEY' in your environment")
-
-            api_base = dynamic_api_base or optional_params.api_base or litellm.api_base or "https://api.together.ai/v1"
-
-            response = together_rerank.rerank(
-                model=model,
-                query=query,
-                documents=documents,
-                top_n=top_n,
-                rank_fields=rank_fields,
-                return_documents=return_documents,
-                max_chunks_per_doc=max_chunks_per_doc,
-                api_key=api_key,
-                api_base=api_base,
-                _is_async=_is_async,
-            )
         elif _custom_llm_provider == litellm.LlmProviders.JINA_AI:
             if dynamic_api_key is None:
                 raise ValueError("Jina AI API key is required, please set 'JINA_AI_API_KEY' in your environment")
@@ -365,33 +394,6 @@ def rerank(
                 client=client,
                 model_response=model_response,
                 litellm_params=rerank_litellm_params,
-            )
-        elif _custom_llm_provider == litellm.LlmProviders.BEDROCK:
-            api_base = (
-                dynamic_api_base or optional_params.api_base or litellm.api_base or get_secret("BEDROCK_API_BASE")
-            )
-
-            # Merge headers and extra_headers if both are provided
-            merged_headers = headers or litellm.headers or {}
-            extra_headers_from_kwargs: Final = kwargs.get("extra_headers")
-            if extra_headers_from_kwargs:
-                merged_headers = {**merged_headers, **extra_headers_from_kwargs}
-
-            response = bedrock_rerank.rerank(
-                model=model,
-                query=query,
-                documents=documents,
-                top_n=top_n,
-                rank_fields=rank_fields,
-                return_documents=return_documents,
-                max_chunks_per_doc=max_chunks_per_doc,
-                _is_async=_is_async,
-                optional_params=optional_params.model_dump(exclude_unset=True),
-                timeout=optional_params.timeout,
-                api_base=api_base,
-                extra_headers=merged_headers,
-                logging_obj=litellm_logging_obj,
-                client=client,
             )
         elif _custom_llm_provider == litellm.LlmProviders.HOSTED_VLLM:
             # Implement Hosted VLLM rerank logic

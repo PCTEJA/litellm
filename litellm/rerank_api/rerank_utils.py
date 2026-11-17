@@ -4,7 +4,7 @@ from litellm.llms.base_llm.rerank.transformation import BaseRerankConfig
 
 
 def get_optional_rerank_params(
-    rerank_provider_config: BaseRerankConfig,
+    rerank_provider_config: BaseRerankConfig | None,
     model: str,
     drop_params: bool,
     query: str,
@@ -36,6 +36,8 @@ def get_optional_rerank_params(
         # there (e.g. DeepInfra) keep working now that `rerank()` consumes
         # `instruction` as a named param instead of leaving it in **kwargs.
         all_non_default_params["instruction"] = instruction
+    if rerank_provider_config is None:
+        return all_non_default_params
     return rerank_provider_config.map_cohere_rerank_params(
         model=model,
         drop_params=drop_params,

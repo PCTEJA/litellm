@@ -1744,6 +1744,39 @@ def test_get_provider_rerank_config():
     assert isinstance(config, HostedVLLMRerankConfig)
 
 
+def test_get_provider_rerank_config_without_dedicated_config_returns_none() -> None:
+    """
+    Providers with no rerank config of their own resolve to None, never to a
+    silent Cohere fallback, whose default URL points at Cohere's API and would
+    send the provider's API key there. Together AI and Bedrock rerank through
+    dedicated handlers that do not consume this config, so they are None here
+    as well.
+    """
+    from litellm.utils import LlmProviders
+
+    for provider in (
+        LlmProviders.OPENAI,
+        LlmProviders.OLLAMA,
+        LlmProviders.TOGETHER_AI,
+        LlmProviders.BEDROCK,
+    ):
+        assert ProviderConfigManager.get_provider_rerank_config("my_model", provider, None, []) is None
+
+
+def test_get_provider_rerank_config_litellm_proxy_keeps_cohere_config() -> None:
+    """
+    The proxy rerank endpoint speaks Cohere's rerank API shape, so
+    litellm_proxy keeps resolving to the Cohere config.
+    """
+    from litellm import CohereRerankConfig
+    from litellm.utils import LlmProviders
+
+    config: Final = ProviderConfigManager.get_provider_rerank_config(
+        "my_model", LlmProviders.LITELLM_PROXY, None, []
+    )
+    assert isinstance(config, CohereRerankConfig)
+
+
 def test_get_provider_video_config_resolves_a_custom_provider_map_base_video_config(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -2258,6 +2258,25 @@ def test_vertex_semantic_ranker_rerank_completion_cost_is_nonzero(
     assert cost == pytest.approx(3 * litellm.model_cost[model]["input_cost_per_query"])
 
 
+def test_bedrock_rerank_completion_cost_is_nonzero(_local_model_cost_map: None) -> None:
+    """Bedrock rerank has no BaseRerankConfig, its handler is dedicated, but its
+    models are priced per query in the model map, so cost still resolves."""
+    response: Final = RerankResponse(
+        id="bedrock_rerank_pricing_test",
+        results=[],
+        meta={"billed_units": {"search_units": 3}},
+    )
+
+    cost: Final = completion_cost(
+        completion_response=response,
+        model="bedrock/amazon.rerank-v1:0",
+        custom_llm_provider="bedrock",
+        call_type="rerank",
+    )
+
+    assert cost == pytest.approx(3 * litellm.model_cost["amazon.rerank-v1:0"]["input_cost_per_query"])
+
+
 def test_azure_realtime_cost_calculator(_local_model_cost_map):
 
     cost = handle_realtime_stream_cost_calculation(
